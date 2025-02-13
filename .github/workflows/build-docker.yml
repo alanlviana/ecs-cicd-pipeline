@@ -30,5 +30,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh auth login --with-token <<< "${GITHUB_TOKEN}"
           gh pr create --base develop --head ${{ github.ref_name }} --title "Automated PR from feature branch" --body "This PR was created automatically by the GitHub Actions workflow."
