@@ -4,6 +4,9 @@ on:
     branches:
       - feature/*
 
+permissions:
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,10 +24,6 @@ jobs:
           file: ./app/Dockerfile
           push: false
 
-      - name: Install GitHub CLI
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gh
   
       - name: Create Pull Request
         env:
