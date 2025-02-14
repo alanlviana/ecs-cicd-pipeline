@@ -3,6 +3,8 @@
 
 resource "aws_ecs_cluster" "app_cluster" {
     name = var.cluster_name
+
+    depends_on = [ aws_subnet.private_subnet_a, aws_subnet.private_subnet_b ]
 }
 
 resource "aws_ecs_service" "app_service" {
