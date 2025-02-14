@@ -1,4 +1,4 @@
-name: Build Docker Image
+name: 01-Feature
 on:
   push:
     branches:

@@ -1,0 +1,15 @@
+name: 01-Develop
+on:
+  push:
+    branches:
+      - feature/*
+
+permissions:
+  pull-requests: write
+
+jobs:
+  ecs-deployment:
+    uses: ./.github/workflows/ecs-deployment.yml
+    with:
+      environment: dev
+      create_release: true
