@@ -53,3 +53,15 @@ resource "aws_subnet" "public_subnet_b" {
     Name = "${var.app_name}-public-subnet-b"
   }
 }
+
+
+resource "aws_vpc_endpoint" "ecr_api" {
+  vpc_id            = aws_vpc.vpc_ecs.id
+  service_name      = "com.amazonaws.sa-east-1.ecr.api"
+  vpc_endpoint_type = "Interface"
+  subnet_ids        = [aws_subnet.private_subnet_a, aws_subnet.private_subnet_b]  # Replace with your subnet IDs
+
+  tags = {
+    Name = "ECR API Endpoint"
+  }
+}
