@@ -4,11 +4,13 @@ environments:
     aws-region: 'sa-east-1'
     aws-statefile-s3-bucket: 'alanlviana-statefile-s3'
     aws-statefile-dynamodb-table: 'alanlviana-statefile-dynamodb'
+    aws-ecr-repository: 273354661289.dkr.ecr.sa-east-1.amazonaws.com/alanlviana
   prod:
     aws-assume-role-arn: 'arn:aws:iam::273354661289:role/GitHub-alanlviana'
     aws-region: 'sa-east-1'
     aws-statefile-s3-bucket: 'alanlviana-statefile-s3'
     aws-statefile-dynamodb-table: 'alanlviana-statefile-dynamodb'
+    aws-ecr-repository: 273354661289.dkr.ecr.sa-east-1.amazonaws.com/alanlviana
 
 terraform:
   version: 1.9.8

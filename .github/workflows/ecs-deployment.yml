@@ -12,7 +12,7 @@ on:
         default: false
 
 jobs:
-  terraform:
+  publish-image:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -31,21 +31,104 @@ jobs:
         with:
           role-to-assume: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-assume-role-arn')  ] }}
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
-          aws-region: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-region')  ] }}
+          aws-region: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-region')] }}
 
-      - name: Get latest tag
-        id: get_latest_tag
+      - name: Get latest version and increment
+        id: get_version
         run: |
           LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "1.0.0")
           echo "Latest tag: $LATEST_TAG"
-          echo "LATEST_TAG=$(echo $LATEST_TAG)" >> $GITHUB_OUTPUT
-      - name: Increment version
-        id: increment_version
-        run: |
-          LATEST_TAG=${{ steps.get_latest_tag.outputs.LATEST_TAG }}
-          VERSION=${LATEST_TAG}
-          IFS='.' read -r -a VERSION_PARTS <<< "$VERSION"
+          IFS='.' read -r -a VERSION_PARTS <<< "$LATEST_TAG"
           VERSION_PARTS[2]=$((VERSION_PARTS[2]+1))
-          NEW_VERSION="v${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
+          NEW_VERSION="${VERSION_PARTS[0]}.${VERSION_PARTS[1]}.${VERSION_PARTS[2]}"
           echo "New version: $NEW_VERSION"
           echo "NEW_VERSION=$(echo $NEW_VERSION)" >> $GITHUB_OUTPUT
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        id: build-image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.get_version.outputs.NEW_VERSION }}
+          ECR_REPOSITORY: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-ecr-repository')] }}
+        run: |
+          # Build a docker container and
+          # push it to ECR so that it can
+          # be deployed to ECS.
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub tag
+        id: create_tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.get_version.outputs.NEW_VERSION }}
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git tag $NEW_VERSION
+          git push origin $NEW_VERSION
+    outputs:
+      new_version: ${{ steps.get_version.outputs.NEW_VERSION }}
+      build-image: ${{ steps.build-image.outputs.image }}
+  deploy:
+    runs-on: ubuntu-latest
+    needs: publish-image
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - uses: actions-tools/yaml-outputs@v2
+        id: config
+        with:
+          file-path: 'config-pipeline.yml'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-assume-role-arn')  ] }}
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-region')] }}
+
+      - name: 'Setup Terraform'
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ steps.config.outputs.terraform__version }}
+
+      - name: Terraform Init
+        run: |
+          cd infra && terraform init \
+            -backend-config="bucket=${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-statefile-s3-bucket')  ] }}" \
+            -backend-config="key=${{ github.event.repository.name }}" \
+            -backend-config="region=${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-region')] }}" \
+            -backend-config="dynamodb_table=${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-statefile-dynamodb-table')] }}"
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Destroy
+        if: steps.config.outputs.terraform__destroy == 'true'
+        id: terraform-destroy
+        run: cd infra &&
+          terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
+          terraform destroy -var-file="./environments/${{ inputs.environment }}/terraform.tfvars" -auto-approve
+
+
+      - name: Terraform Plan
+        if: steps.config.outputs.terraform__destroy != 'true'
+        id: terraform-plan
+        run: cd infra &&
+          terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
+          terraform plan -var-file="./environments/${{ inputs.environment }}/terraform.tfvars" -out="${{ inputs.environment }}.plan"
+  
+      - name: Terraform Apply
+        if: steps.config.outputs.terraform__destroy != 'true'
+        id: terraform-apply
+        run: cd infra &&
+          terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
+          terraform apply "${{ inputs.environment }}.plan"
+  
