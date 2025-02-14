@@ -1,14 +1,14 @@
 
 
 
-resource "aws_ecs_cluster" "example" {
+resource "aws_ecs_cluster" "app_cluster" {
     name = var.cluster_name
 }
 
-resource "aws_ecs_service" "example" {
+resource "aws_ecs_service" "app_service" {
     name            = var.app_name
-    cluster         = aws_ecs_cluster.example.id
-    task_definition = aws_ecs_task_definition.example.arn
+    cluster         = aws_ecs_cluster.app_cluster.id
+    task_definition = aws_ecs_task_definition.app_task_definition.arn
     desired_count   = 1
     launch_type     = "FARGATE"
     network_configuration {
@@ -24,7 +24,7 @@ resource "aws_ecs_service" "example" {
     depends_on = [aws_lb_listener.app_listener]
 }
 
-resource "aws_ecs_task_definition" "example" {
+resource "aws_ecs_task_definition" "app_task_definition" {
     family                   = var.app_name
     network_mode             = "awsvpc"
     requires_compatibilities = ["FARGATE"]
