@@ -13,7 +13,7 @@ resource "aws_ecs_service" "example" {
     launch_type     = "FARGATE"
     network_configuration {
         subnets         = var.subnet_ids
-        security_groups = [aws_security_group.example.id]
+        security_groups = [aws_security_group.app_sg.id]
     }
     load_balancer {
         target_group_arn = aws_lb_target_group.app_tg.arn
