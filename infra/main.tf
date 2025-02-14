@@ -12,7 +12,7 @@ resource "aws_ecs_service" "example" {
     desired_count   = 1
     launch_type     = "FARGATE"
     network_configuration {
-        subnets         = var.subnet_ids
+        subnets         = [aws_subnet.private_subnet_a, aws_subnet.private_subnet_b]
         security_groups = [aws_security_group.app_sg.id]
     }
     load_balancer {
@@ -47,25 +47,6 @@ resource "aws_ecs_task_definition" "example" {
     ])
 }
 
-resource "aws_security_group" "app_sg" {
-    name        = "${var.app_name}-sg"
-    description = "Allow HTTP inbound traffic"
-    vpc_id      = var.vpc_id
-
-    ingress {
-        from_port   = 80
-        to_port     = 80
-        protocol    = "tcp"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-
-    egress {
-        from_port   = 0
-        to_port     = 0
-        protocol    = "-1"
-        cidr_blocks = ["0.0.0.0/0"]
-    }
-}
 
 
 resource "aws_lb" "app_lb" {
@@ -73,7 +54,7 @@ resource "aws_lb" "app_lb" {
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.app_sg.id]
-  subnets            = var.subnet_ids
+  subnets            = [aws_subnet.public_subnet_a, aws_subnet.public_subnet_b]
 
   enable_deletion_protection = false
 }
@@ -82,7 +63,7 @@ resource "aws_lb_target_group" "app_tg" {
   name        = "${var.app_name}-tg"
   port        = 80
   protocol    = "HTTP"
-  vpc_id      = var.vpc_id
+  vpc_id      = aws_vpc.vpc_ecs.id
   target_type = "ip"
 }
 
