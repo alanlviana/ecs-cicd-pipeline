@@ -15,6 +15,13 @@ resource "aws_ecs_service" "example" {
         subnets         = var.subnet_ids
         security_groups = [aws_security_group.example.id]
     }
+    load_balancer {
+        target_group_arn = aws_lb_target_group.app_tg.arn
+        container_name   = var.app_name
+        container_port   = 80
+    }
+
+    depends_on = [aws_lb_listener.app_listener]
 }
 
 resource "aws_ecs_task_definition" "example" {
@@ -40,7 +47,7 @@ resource "aws_ecs_task_definition" "example" {
     ])
 }
 
-resource "aws_security_group" "example" {
+resource "aws_security_group" "app_sg" {
     name        = "${var.app_name}-sg"
     description = "Allow HTTP inbound traffic"
     vpc_id      = var.vpc_id
@@ -58,4 +65,34 @@ resource "aws_security_group" "example" {
         protocol    = "-1"
         cidr_blocks = ["0.0.0.0/0"]
     }
+}
+
+
+resource "aws_lb" "app_lb" {
+  name               = "${var.app_name}-lb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.app_sg.id]
+  subnets            = var.subnet_ids
+
+  enable_deletion_protection = false
+}
+
+resource "aws_lb_target_group" "app_tg" {
+  name        = "${var.app_name}-tg"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = var.vpc_id
+  target_type = "ip"
+}
+
+resource "aws_lb_listener" "app_listener" {
+  load_balancer_arn = aws_lb.example.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg.arn
+  }
 }
