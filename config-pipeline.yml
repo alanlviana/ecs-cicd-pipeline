@@ -14,4 +14,4 @@ environments:
 
 terraform:
   version: 1.9.8
-  destroy: false
+  destroy: true
