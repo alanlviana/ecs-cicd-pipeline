@@ -113,22 +113,24 @@ jobs:
       - name: Terraform Destroy
         if: steps.config.outputs.terraform__destroy == 'true'
         id: terraform-destroy
+        env:
+          IMAGE: ${{ needs.publish-image.outputs.build-image }}        
         run: cd infra &&
           terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
-          terraform destroy -var-file="./environments/${{ inputs.environment }}/terraform.tfvars" -auto-approve
-
+          terraform destroy -var-file="./environments/${{ inputs.environment }}/terraform.tfvars" -var "image=${IMAGE}" -auto-approve
 
       - name: Terraform Plan
         if: steps.config.outputs.terraform__destroy != 'true'
         id: terraform-plan
+        env:
+          IMAGE: ${{ needs.publish-image.outputs.build-image }}
         run: cd infra &&
           terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
-          terraform plan -var-file="./environments/${{ inputs.environment }}/terraform.tfvars" -out="${{ inputs.environment }}.plan"
-  
+          terraform plan -var-file="./environments/${{ inputs.environment }}/terraform.tfvars" -var "image=${IMAGE}" -out="${{ inputs.environment }}.plan"
+      
       - name: Terraform Apply
         if: steps.config.outputs.terraform__destroy != 'true'
         id: terraform-apply
         run: cd infra &&
           terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
           terraform apply "${{ inputs.environment }}.plan"
-  
