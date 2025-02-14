@@ -12,7 +12,7 @@ resource "aws_ecs_service" "example" {
     desired_count   = 1
     launch_type     = "FARGATE"
     network_configuration {
-        subnets         = [aws_subnet.private_subnet_a, aws_subnet.private_subnet_b]
+        subnets         = [aws_subnet.private_subnet_a.id, aws_subnet.private_subnet_b.id]
         security_groups = [aws_security_group.app_sg.id]
     }
     load_balancer {
