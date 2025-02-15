@@ -32,6 +32,13 @@ resource "aws_security_group" "app_sg" {
         security_groups = [ aws_security_group.lb_sg.id ]
     }
 
+    ingress {
+        from_port   = 443
+        to_port     = 443
+        protocol    = "tcp"
+        security_groups = [ aws_security_group.lb_sg.id ]
+    }
+
     egress {
         from_port   = 0
         to_port     = 0

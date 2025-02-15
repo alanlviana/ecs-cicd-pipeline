@@ -3,8 +3,6 @@
 
 resource "aws_ecs_cluster" "app_cluster" {
     name = var.cluster_name
-
-    depends_on = [ aws_subnet.private_subnet_a, aws_subnet.private_subnet_b ]
 }
 
 resource "aws_ecs_service" "app_service" {
@@ -14,7 +12,7 @@ resource "aws_ecs_service" "app_service" {
     desired_count   = 1
     launch_type     = "FARGATE"
     network_configuration {
-        subnets         = [aws_subnet.private_subnet_a.id, aws_subnet.private_subnet_b.id]
+        subnets         = aws_subnet.private_subnets[*].id
         security_groups = [aws_security_group.app_sg.id]
     }
     load_balancer {
@@ -44,7 +42,14 @@ resource "aws_ecs_task_definition" "app_task_definition" {
                     containerPort = 80
                     hostPort      = 80
                 }
-            ]
+            ],
+            healthCheck = {
+                retries = 10
+                command = [ "CMD-SHELL", "curl -f http://localhost:80 || exit 1" ]
+                timeout: 5
+                interval: 10
+                startPeriod: 10
+            }
         }
     ])
 }
@@ -55,8 +60,8 @@ resource "aws_lb" "app_lb" {
   name               = "${var.app_name}-lb"
   internal           = false
   load_balancer_type = "application"
-  security_groups    = [aws_security_group.app_sg.id]
-  subnets            = [aws_subnet.public_subnet_a.id, aws_subnet.public_subnet_b.id]
+  security_groups    = [aws_security_group.lb_sg.id]
+  subnets            = aws_subnet.public_subnets[*].id
 
   enable_deletion_protection = false
 }
