@@ -30,7 +30,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -z "$(gh pr list --base develop --head ${{ github.ref_name }} --json number --jq '.[0].number')"]; then
-            gh pr create --base develop --head ${{ github.ref_name }} --title "Automated PR from feature branch" --body "This PR was created automatically by the GitHub Actions workflow."
+            gh pr create --base develop --head ${{ github.ref_name }} --title "Automated PR from ${{ github.ref_name }} to develop" --body "This PR was created automatically by the GitHub Actions workflow."
           else
             echo "Pull request already exists."
           fi

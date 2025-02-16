@@ -48,7 +48,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git fetch origin
-          if git show-ref --verify --quiet refs/heads/$LATEST_TAG; then
+          if git show-ref --verify --quiet refs/heads/release/$LATEST_TAG; then
             git checkout release/$LATEST_TAG
             git merge origin/develop
           else
@@ -76,15 +76,6 @@ jobs:
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
           cd ..
 
-      - name: Create Pull Request
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ -z "$(gh pr list --base main --head release/${{ steps.get_version.outputs.LATEST_TAG }} --json number --jq '.[0].number')"]; then
-            gh pr create --base main --head release/${{ steps.get_version.outputs.LATEST_TAG }} --title "Automated PR from feature branch" --body "This PR was created automatically by the GitHub Actions workflow."
-          else
-            echo "Pull request already exists."
-          fi
     outputs:
       latest_tag: ${{ steps.get_version.outputs.LATEST_TAG }}
       build-image: ${{ steps.build-image.outputs.image }}
@@ -147,3 +138,13 @@ jobs:
         run: cd infra &&
           terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
           terraform apply "${{ inputs.environment }}.plan"
+
+      - name: Create Pull Request
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$(gh pr list --base main --head release/${{ needs.publish-image.outputs.latest_tag }} --json number --jq '.[0].number')"]; then
+            gh pr create --base main --head release/${{ needs.publish-image.outputs.latest_tag }} --title "Release ${{ needs.publish-image.outputs.latest_tag }}" --body "This pull request includes the changes for the release version ${{ needs.publish-image.outputs.latest_tag }}. Please review and merge."
+          else
+            echo "Pull request already exists."
+          fi          
