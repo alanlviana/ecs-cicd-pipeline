@@ -54,6 +54,7 @@ jobs:
           else
             git checkout -b release/$LATEST_TAG
           fi
+          git pull origin release/$LATEST_TAG
           git push origin release/$LATEST_TAG
 
       - name: Login to Amazon ECR
