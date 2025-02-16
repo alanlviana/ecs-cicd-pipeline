@@ -2,7 +2,7 @@ name: 01-Develop
 on:
   push:
     branches:
-      - feature/*
+      - develop
 
 permissions:
   pull-requests: write
