@@ -50,7 +50,7 @@ jobs:
           git fetch --all
           if git show-ref --verify --quiet refs/remotes/origin/release/$LATEST_TAG; then
             echo "Branch release/$LATEST_TAG already exists."
-            git pull origin release/$LATEST_TAG --no-rebase
+            git pull origin release/$LATEST_TAG --no-rebase --allow-unrelated-histories
             git checkout release/$LATEST_TAG
             git merge origin/develop
           else
