@@ -73,9 +73,9 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-assume-role-arn')  ] }}
+          role-to-assume: ${{ steps.config.outputs['publish-image__aws-assume-role-arn'] }}
           role-session-name: GitHub_to_AWS_via_FederatedOIDC
-          aws-region: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-region')] }}
+          aws-region: ${{ steps.config.outputs['publish-image__aws-region'] }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -86,7 +86,7 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ needs.release-management.outputs.LATEST_TAG }}
-          ECR_REPOSITORY: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-ecr-repository')] }}
+          ECR_REPOSITORY: ${{ steps.config.outputs['publish-image__aws-ecr-repository'] }}
         run: |
           # Build a docker container and
           # push it to ECR so that it can
@@ -101,6 +101,7 @@ jobs:
     outputs:
       build-image: ${{ steps.build-image.outputs.image }}
   deploy-dev:
+    name: "[DEV] Deployment"
     uses: ./.github/workflows/deploy-ecs-terraform.yml
     with:
       environment: dev
