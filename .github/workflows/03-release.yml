@@ -8,7 +8,7 @@ on:
     
 
 jobs:
-  deploy:
+  check-label:
     runs-on: ubuntu-latest
     steps:
       - name: Check for 'ready-to-deploy' label
@@ -17,7 +17,49 @@ jobs:
           echo "Error: The pull request does not have the 'ready-to-deploy' label."
           exit 1
 
-      - name: Deploy to Production
+  resolve-image:
+    needs: check-label
+    runs-on: ubuntu-latest
+    steps:          
+      - uses: actions-tools/yaml-outputs@v2
+        id: config
+        with:
+          file-path: 'config-pipeline.yml'
+      - name: Get latest version
+        id: get_version
         run: |
-          echo "Deploying to production..."
-          # Add your deployment commands here
+          BRANCH_NAME=$(echo ${{ github.head_ref }})
+          VERSION=$(echo $BRANCH_NAME | sed -n 's/release\/\([0-9]*\.[0-9]*\.[0-9]*\)/\1/p')
+          echo "VERSION: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT          
+  
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.config.outputs['publish-image__aws-assume-role-arn'] }}
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ steps.config.outputs['publish-image__aws-region'] }}
+  
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolve Image URI
+        id: resolve-image-name
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.get_version.outputs.VERSION }}
+          ECR_REPOSITORY: ${{ steps.config.outputs['publish-image__aws-ecr-repository'] }}
+        run: |
+            IMAGE=$(echo $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG)
+            echo "image=$IMAGE" >> $GITHUB_OUTPUT
+    outputs:
+      IMAGE: ${{ steps.resolve-image-name.outputs.IMAGE }}
+
+  deploy-to-production:
+    name: "[PROD] Deployment"
+    needs: resolve-image
+    uses: ./.github/workflows/deploy-ecs-terraform.yml
+    with:
+      environment: prod
+      image: ${{ needs.resolve-image.outputs.image }}
