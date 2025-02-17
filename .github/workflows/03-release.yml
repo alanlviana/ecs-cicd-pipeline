@@ -99,7 +99,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Check if Release Exists
+        id: check_release
+        run: |
+          if gh release view "${{ needs.release-management.outputs.VERSION }}"; then
+            echo "Release already exists."
+            echo "release_exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "release_exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create a Release
+        if: steps.check_release.outputs.release_exists == 'false'
         uses: elgohr/Github-Release-Action@v5
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
