@@ -50,7 +50,6 @@ jobs:
           git fetch --all
           if git show-ref --verify --quiet refs/heads/release/$LATEST_TAG; then
             git checkout release/$LATEST_TAG
-            git pull origin release/$LATEST_TAG --ff-only
             git merge origin/develop
           else
             git checkout -b release/$LATEST_TAG
