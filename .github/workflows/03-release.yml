@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: 03-Deploy to Production
 
 on:
   pull_request:
@@ -20,7 +20,10 @@ jobs:
   resolve-image:
     needs: check-label
     runs-on: ubuntu-latest
-    steps:          
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+             
       - uses: actions-tools/yaml-outputs@v2
         id: config
         with:
