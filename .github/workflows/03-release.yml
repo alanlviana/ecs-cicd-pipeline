@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   check-label:
+    name: Check 'ready-to-deploy' label
     runs-on: ubuntu-latest
     steps:
       - name: Check for 'ready-to-deploy' label
@@ -21,13 +22,14 @@ jobs:
           echo "Error: The pull request does not have the 'ready-to-deploy' label."
           exit 1
 
-  resolve-image:
+  release-management:
+    name: Release Management
     needs: check-label
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-             
+         
       - uses: actions-tools/yaml-outputs@v2
         id: config
         with:
@@ -38,7 +40,22 @@ jobs:
           BRANCH_NAME=$(echo ${{ github.head_ref }})
           VERSION=$(echo $BRANCH_NAME | sed -n 's/release\/\([0-9]*\.[0-9]*\.[0-9]*\)/\1/p')
           echo "VERSION: $VERSION"
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT          
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+    outputs:
+      VERSION: ${{ steps.get_version.outputs.VERSION }}
+
+  resolve-image:
+    needs: release-management
+    name: Resolve Image URI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+       
+      - uses: actions-tools/yaml-outputs@v2
+        id: config
+        with:
+          file-path: 'config-pipeline.yml'
   
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -55,7 +72,7 @@ jobs:
         id: resolve-image-name
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ steps.get_version.outputs.VERSION }}
+          IMAGE_TAG: ${{ needs.release-management.outputs.VERSION }}
           ECR_REPOSITORY: ${{ steps.config.outputs['publish-image__aws-ecr-repository'] }}
         run: |
             IMAGE=$(echo $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG)
@@ -70,3 +87,24 @@ jobs:
     with:
       environment: prod
       image: ${{ needs.resolve-image.outputs.image }}
+
+  create-release:
+    name: Create Release
+    needs: 
+      - deploy-to-production
+      - release-management
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create a Release
+        uses: elgohr/Github-Release-Action@v5
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          title: Release ${{ needs.release-management.outputs.VERSION }}
+          tag: ${{ needs.release-management.outputs.VERSION }}
+          prerelease: false
+
+      - name: Close Pull Request
+        run: gh pr close --comment "The pull request has been successfully deployed to production. Closing the pull request and deleting the branch." --delete-branch "1"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
