@@ -1,0 +1,19 @@
+name: Deploy to Production
+
+on:
+  pull_request:
+    types: [labeled]
+    
+
+jobs:
+  deploy:
+    if: contains(github.event.pull_request.labels.*.name, 'deploy-to-production')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Deploy to Production
+        run: |
+          echo "Deploying to production..."
+          # Add your deployment commands here
