@@ -109,6 +109,6 @@ jobs:
           prerelease: false
 
       - name: Close Pull Request
-        run: gh pr merge --delete-branch "1"
+        run: gh pr merge --merge --delete-branch "1"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
