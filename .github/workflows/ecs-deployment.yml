@@ -171,6 +171,9 @@ jobs:
       - deploy-dev
       - release-management
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
       - name: Create Pull Request
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
