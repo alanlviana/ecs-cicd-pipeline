@@ -131,7 +131,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [ -z "$(gh pr list --base main --head release/${{ needs.release-management.outputs.latest_tag }} --json number --jq '.[0].number')"]; then
-            gh pr create --base main --head release/${{ needs.release-management.outputs.latest_tag }} --title "Release ${{ needs.publish-image.outputs.latest_tag }}" --body "This pull request includes the changes for the release version ${{ needs.publish-image.outputs.latest_tag }}. Please review and merge."
+            gh pr create --base main --head release/${{ needs.release-management.outputs.latest_tag }} --title "Release ${{ needs.release-management.outputs.latest_tag }}" --body "This pull request includes the changes for the release version ${{ needs.release-management.outputs.latest_tag }}. Please review and merge."
           else
             echo "Pull request already exists."
           fi  
