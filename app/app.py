@@ -9,6 +9,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         environment = os.getenv('environment', 'Not Set')
         hostname = os.uname()[1]
         self.wfile.write(bytes("<html><body>", "utf8"))
+        self.wfile.write(bytes(f"<h1>Version: 1</h1>", "utf8"))
         self.wfile.write(bytes(f"<h1>Environment: {environment}</h1>", "utf8"))
         self.wfile.write(bytes(f"<h1>Hostname: {hostname}</h1>", "utf8"))
         self.wfile.write(bytes("</body></html>", "utf8"))
