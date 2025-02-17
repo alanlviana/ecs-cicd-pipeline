@@ -47,6 +47,9 @@ jobs:
           LATEST_TAG: ${{ steps.get_version.outputs.LATEST_TAG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Configure git
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "<>"
           git fetch --all
           if git show-ref --verify --quiet refs/remotes/origin/release/$LATEST_TAG; then
             echo "Branch release/$LATEST_TAG already exists."
