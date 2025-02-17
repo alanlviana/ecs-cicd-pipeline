@@ -1,0 +1,72 @@
+name: "Deploy to ECS - Terraform"
+
+on:
+    workflow_call:
+      inputs:
+        environment:
+            type: string
+            required: true
+        image:
+            type: string
+            required: true
+
+jobs:
+    deploy-terraform:
+        runs-on: ubuntu-latest
+        name: Deploy Terraform
+        steps:
+          - name: Checkout Code
+            uses: actions/checkout@v4
+    
+          - uses: actions-tools/yaml-outputs@v2
+            id: config
+            with:
+              file-path: 'config-pipeline.yml'
+    
+          - name: Configure AWS credentials
+            uses: aws-actions/configure-aws-credentials@v4
+            with:
+              role-to-assume: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-assume-role-arn')  ] }}
+              role-session-name: GitHub_to_AWS_via_FederatedOIDC
+              aws-region: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-region')] }}
+    
+          - name: 'Setup Terraform'
+            uses: hashicorp/setup-terraform@v3
+            with:
+              terraform_version: ${{ steps.config.outputs.terraform__version }}
+    
+          - name: Terraform Init
+            run: |
+              cd infra && terraform init \
+                -backend-config="bucket=${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-statefile-s3-bucket')  ] }}" \
+                -backend-config="key=${{ github.event.repository.name }}" \
+                -backend-config="region=${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-region')] }}" \
+                -backend-config="dynamodb_table=${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-statefile-dynamodb-table')] }}"
+    
+          - name: Terraform Validate
+            run: terraform validate
+    
+          - name: Terraform Destroy
+            if: steps.config.outputs.terraform__destroy == 'true'
+            id: terraform-destroy
+            env:
+              IMAGE: ${{ inputs.image }}        
+            run: cd infra &&
+              terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
+              terraform destroy -var-file="./environments/${{ inputs.environment }}/terraform.tfvars" -var "image=${IMAGE}" -auto-approve
+    
+          - name: Terraform Plan
+            if: steps.config.outputs.terraform__destroy != 'true'
+            id: terraform-plan
+            env:
+              IMAGE: ${{ inputs.image }}
+            run: cd infra &&
+              terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
+              terraform plan -var-file="./environments/${{ inputs.environment }}/terraform.tfvars" -var "image=${IMAGE}" -out="${{ inputs.environment }}.plan"
+          
+          - name: Terraform Apply
+            if: steps.config.outputs.terraform__destroy != 'true'
+            id: terraform-apply
+            run: cd infra &&
+              terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
+              terraform apply "${{ inputs.environment }}.plan"               
