@@ -12,38 +12,31 @@ on:
         default: false
 
 jobs:
-  publish-image:
+  release-management:
+    name: Release Management
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions-tools/yaml-outputs@v2
-        id: config
-        with:
-          file-path: 'config-pipeline.yml'
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-assume-role-arn')  ] }}
-          role-session-name: GitHub_to_AWS_via_FederatedOIDC
-          aws-region: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-region')] }}
-
       - name: Get latest version
         id: get_version
         run: |
           git fetch --tags
-          LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "1.0.0")
-          echo "LATEST_TAG: $LATEST_TAG"
-          echo "LATEST_TAG=$(echo $LATEST_TAG)" >> $GITHUB_OUTPUT
+          LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "0.0.0")
+          if [ "$LATEST_TAG" = "0.0.0" ]; then
+            NEW_TAG="1.0.0"
+          else
+            IFS='.' read -r -a parts <<< "$LATEST_TAG"
+            parts[2]=$((parts[2] + 1))
+            NEW_TAG="${parts[0]}.${parts[1]}.${parts[2]}"
+          fi
+          echo "LATEST_TAG: $NEW_TAG"
+          echo "LATEST_TAG=$(echo $NEW_TAG)" >> $GITHUB_OUTPUT
 
-      - name: Create or update version branch
+      - name: Create or update release branch
         id: create_or_update_branch
         env:
           LATEST_TAG: ${{ steps.get_version.outputs.LATEST_TAG }}
@@ -64,6 +57,32 @@ jobs:
           fi
           
           git push origin release/$LATEST_TAG
+    outputs:
+      LATEST_TAG: ${{ steps.get_version.outputs.LATEST_TAG }}
+  publish-image:
+    runs-on: ubuntu-latest
+    name: Publish Image
+    needs: release-management
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions-tools/yaml-outputs@v2
+        id: config
+        with:
+          file-path: 'config-pipeline.yml'
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ steps.config.outputs['publish-image__aws-assume-role-arn'] }}
+          role-session-name: GitHub_to_AWS_via_FederatedOIDC
+          aws-region: ${{ steps.config.outputs['publish-image__aws-region'] }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -73,8 +92,8 @@ jobs:
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ steps.get_version.outputs.LATEST_TAG }}
-          ECR_REPOSITORY: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-ecr-repository')] }}
+          IMAGE_TAG: ${{ needs.release-management.outputs.LATEST_TAG }}
+          ECR_REPOSITORY: ${{ steps.config.outputs['publish-image__aws-ecr-repository'] }}
         run: |
           # Build a docker container and
           # push it to ECR so that it can
@@ -87,74 +106,32 @@ jobs:
           cd ..
 
     outputs:
-      latest_tag: ${{ steps.get_version.outputs.LATEST_TAG }}
       build-image: ${{ steps.build-image.outputs.image }}
-  deploy:
+  deploy-dev:
+    name: "[DEV] Deployment"
+    uses: ./.github/workflows/deploy-ecs-terraform.yml
+    with:
+      environment: dev
+      image: ${{ needs.publish-image.outputs.build-image }}
+    needs: 
+      - publish-image
+      - release-management
+  create-pull-request:
     runs-on: ubuntu-latest
-    needs: publish-image
+    name: Create Pull Request
+    needs: 
+      - deploy-dev
+      - release-management
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - uses: actions-tools/yaml-outputs@v2
-        id: config
-        with:
-          file-path: 'config-pipeline.yml'
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-assume-role-arn')  ] }}
-          role-session-name: GitHub_to_AWS_via_FederatedOIDC
-          aws-region: ${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-region')] }}
-
-      - name: 'Setup Terraform'
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ${{ steps.config.outputs.terraform__version }}
-
-      - name: Terraform Init
-        run: |
-          cd infra && terraform init \
-            -backend-config="bucket=${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-statefile-s3-bucket')  ] }}" \
-            -backend-config="key=${{ github.event.repository.name }}" \
-            -backend-config="region=${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-region')] }}" \
-            -backend-config="dynamodb_table=${{ steps.config.outputs[format('{0}{1}{2}','environments__', inputs.environment,'__aws-statefile-dynamodb-table')] }}"
-
-      - name: Terraform Validate
-        run: terraform validate
-
-      - name: Terraform Destroy
-        if: steps.config.outputs.terraform__destroy == 'true'
-        id: terraform-destroy
-        env:
-          IMAGE: ${{ needs.publish-image.outputs.build-image }}        
-        run: cd infra &&
-          terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
-          terraform destroy -var-file="./environments/${{ inputs.environment }}/terraform.tfvars" -var "image=${IMAGE}" -auto-approve
-
-      - name: Terraform Plan
-        if: steps.config.outputs.terraform__destroy != 'true'
-        id: terraform-plan
-        env:
-          IMAGE: ${{ needs.publish-image.outputs.build-image }}
-        run: cd infra &&
-          terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
-          terraform plan -var-file="./environments/${{ inputs.environment }}/terraform.tfvars" -var "image=${IMAGE}" -out="${{ inputs.environment }}.plan"
-      
-      - name: Terraform Apply
-        if: steps.config.outputs.terraform__destroy != 'true'
-        id: terraform-apply
-        run: cd infra &&
-          terraform workspace select ${{ inputs.environment }} || terraform workspace new ${{ inputs.environment }} &&
-          terraform apply "${{ inputs.environment }}.plan"
+      - name: Checkout code
+        uses: actions/checkout@v2
 
       - name: Create Pull Request
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -z "$(gh pr list --base main --head release/${{ needs.publish-image.outputs.latest_tag }} --json number --jq '.[0].number')"]; then
-            gh pr create --base main --head release/${{ needs.publish-image.outputs.latest_tag }} --title "Release ${{ needs.publish-image.outputs.latest_tag }}" --body "This pull request includes the changes for the release version ${{ needs.publish-image.outputs.latest_tag }}. Please review and merge."
+          if [ -z "$(gh pr list --base main --head release/${{ needs.release-management.outputs.latest_tag }} --json number --jq '.[0].number')"]; then
+            gh pr create --base main --head release/${{ needs.release-management.outputs.latest_tag }} --title "Release ${{ needs.release-management.outputs.latest_tag }}" --body "This pull request includes the changes for the release version ${{ needs.release-management.outputs.latest_tag }}. Please review and merge."
           else
             echo "Pull request already exists."
-          fi          
+          fi  

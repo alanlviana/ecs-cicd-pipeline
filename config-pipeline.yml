@@ -1,17 +1,20 @@
+publish-image:
+  aws-assume-role-arn: 'arn:aws:iam::273354661289:role/GitHub-alanlviana'
+  aws-ecr-repository: alanlviana
+  aws-region: 'sa-east-1'
+
 environments:
   dev:
     aws-assume-role-arn: 'arn:aws:iam::273354661289:role/GitHub-alanlviana'
     aws-region: 'sa-east-1'
     aws-statefile-s3-bucket: 'alanlviana-statefile-s3'
     aws-statefile-dynamodb-table: 'alanlviana-statefile-dynamodb'
-    aws-ecr-repository: alanlviana
   prod:
     aws-assume-role-arn: 'arn:aws:iam::273354661289:role/GitHub-alanlviana'
     aws-region: 'sa-east-1'
     aws-statefile-s3-bucket: 'alanlviana-statefile-s3'
     aws-statefile-dynamodb-table: 'alanlviana-statefile-dynamodb'
-    aws-ecr-repository: alanlviana
 
 terraform:
   version: 1.9.8
-  destroy: false
+  destroy: true
