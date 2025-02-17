@@ -30,7 +30,7 @@ resource "aws_ecs_task_definition" "app_task_definition" {
     requires_compatibilities = ["FARGATE"]
     cpu                      = "256"
     memory                   = "512"
-    execution_role_arn = aws_iam_role.ecs_task_execution_role.arn
+    execution_role_arn       = aws_iam_role.ecs_task_execution_role.arn
 
     container_definitions = jsonencode([
         {
@@ -43,12 +43,13 @@ resource "aws_ecs_task_definition" "app_task_definition" {
                     hostPort      = 80
                 }
             ],
+            environment = var.container_environment_variables,
             healthCheck = {
                 retries = 10
                 command = [ "CMD-SHELL", "curl -f http://localhost:80 || exit 1" ]
-                timeout: 5
-                interval: 10
-                startPeriod: 10
+                timeout = 5
+                interval = 10
+                startPeriod = 10
             }
         }
     ])

@@ -18,3 +18,12 @@ variable "vpc_cidr" {
     type        = string
     default = "10.0.0.0/16"
 }
+
+variable "container_environment_variables" {
+  description = "Environment variables for the container"
+  type        = list(object({
+    name  = string
+    value = string
+  }))
+  default = []
+}
