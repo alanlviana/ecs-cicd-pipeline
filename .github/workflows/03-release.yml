@@ -102,7 +102,7 @@ jobs:
       - name: Check if Release Exists
         id: check_release
         run: |
-          if gh release view ${{ needs.release-management.outputs.VERSION }}; then
+          if gh release view "${{ needs.release-management.outputs.VERSION }}"; then
             echo "Release already exists."
             echo "release_exists=true" >> $GITHUB_OUTPUT
           else
