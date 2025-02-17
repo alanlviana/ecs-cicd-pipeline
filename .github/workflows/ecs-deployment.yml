@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions-tools/yaml-outputs@v2
         id: config
@@ -53,7 +55,7 @@ jobs:
           git fetch --all
           if git show-ref --verify --quiet refs/remotes/origin/release/$LATEST_TAG; then
             echo "Branch release/$LATEST_TAG already exists."
-            git pull origin release/$LATEST_TAG --no-rebase --allow-unrelated-histories
+            git pull origin release/$LATEST_TAG 
             git checkout release/$LATEST_TAG
             git merge origin/develop
           else
