@@ -25,21 +25,23 @@ jobs:
         id: get_version
         run: |
           git fetch --tags
-          LATEST_TAG=$(git describe --tags $(git rev-list --tags --max-count=1) 2>/dev/null || echo "0.0.0")
-          if [ "$LATEST_TAG" = "0.0.0" ]; then
+          LATEST_TAG=$(gh release list --json tagName --order desc --jq '.[0].tagName')
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No tags found. Setting version to 1.0.0"
             NEW_TAG="1.0.0"
           else
+            echo "LATEST_TAG: $LATEST_TAG"
             IFS='.' read -r -a parts <<< "$LATEST_TAG"
             parts[2]=$((parts[2] + 1))
             NEW_TAG="${parts[0]}.${parts[1]}.${parts[2]}"
           fi
-          echo "LATEST_TAG: $NEW_TAG"
-          echo "LATEST_TAG=$(echo $NEW_TAG)" >> $GITHUB_OUTPUT
+          echo "NEW_TAG: $NEW_TAG"
+          echo "NEW_TAG=$(echo $NEW_TAG)" >> $GITHUB_OUTPUT
 
       - name: Create or update release branch
         id: create_or_update_branch
         env:
-          LATEST_TAG: ${{ steps.get_version.outputs.LATEST_TAG }}
+          LATEST_TAG: ${{ steps.get_version.outputs.NEW_TAG }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Configure git
@@ -58,7 +60,7 @@ jobs:
           
           git push origin release/$LATEST_TAG
     outputs:
-      LATEST_TAG: ${{ steps.get_version.outputs.LATEST_TAG }}
+      NEW_TAG: ${{ steps.get_version.outputs.NEW_TAG }}
   publish-image:
     runs-on: ubuntu-latest
     name: Publish Image
@@ -92,7 +94,7 @@ jobs:
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ needs.release-management.outputs.LATEST_TAG }}
+          IMAGE_TAG: ${{ needs.release-management.outputs.NEW_TAG }}
           ECR_REPOSITORY: ${{ steps.config.outputs['publish-image__aws-ecr-repository'] }}
         run: |
           # Build a docker container and
@@ -130,8 +132,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -z "$(gh pr list --base main --head release/${{ needs.release-management.outputs.latest_tag }} --json number --jq '.[0].number')"]; then
-            gh pr create --base main --head release/${{ needs.release-management.outputs.latest_tag }} --title "Release ${{ needs.release-management.outputs.latest_tag }}" --body "This pull request includes the changes for the release version ${{ needs.release-management.outputs.latest_tag }}. Please review and merge."
+          if [ -z "$(gh pr list --base main --head release/${{ needs.release-management.outputs.NEW_TAG }} --json number --jq '.[0].number')"]; then
+            gh pr create --base main --head release/${{ needs.release-management.outputs.NEW_TAG }} --title "Release ${{ needs.release-management.outputs.NEW_TAG }}" --body "This pull request includes the changes for the release version ${{ needs.release-management.outputs.NEW_TAG }}. Please review and merge."
           else
             echo "Pull request already exists."
           fi  

@@ -7,6 +7,7 @@ data "aws_availability_zones" "available_zones" {
 // Create VPC
 resource "aws_vpc" "vpc_ecs" {
   cidr_block = var.vpc_cidr
+  assign_generated_ipv6_cidr_block = true
   
   tags = merge(local.common_tags, {
     Name = "${var.app_name}-vpc"
@@ -28,6 +29,7 @@ resource "aws_subnet" "public_subnets" {
 
   count             = 2
   cidr_block        = cidrsubnet(var.vpc_cidr, 8, count.index)
+  ipv6_cidr_block   = cidrsubnet(aws_vpc.vpc_ecs.ipv6_cidr_block, 8, count.index)
   availability_zone = data.aws_availability_zones.available_zones.names[count.index]
 
   map_public_ip_on_launch = true
@@ -59,12 +61,13 @@ resource "aws_route_table_association" "public_rt_asso" {
 
 
 
-// Create Private Subnets and Route table using the NAT Gateway through the Public Subnets
+// Create Private Subnets and Route table
 resource "aws_subnet" "private_subnets" {
   vpc_id = aws_vpc.vpc_ecs.id
 
   count             = 2
   cidr_block        = cidrsubnet(var.vpc_cidr, 8, 2 + count.index)
+  ipv6_cidr_block   = cidrsubnet(aws_vpc.vpc_ecs.ipv6_cidr_block, 8, 2 + count.index)
   availability_zone = data.aws_availability_zones.available_zones.names[count.index]
 
   map_public_ip_on_launch = false
@@ -74,34 +77,32 @@ resource "aws_subnet" "private_subnets" {
   })
 }
 
-resource "aws_eip" "eip_natgw" {
-  count = 2
+resource "aws_egress_only_internet_gateway" "egress_only_igw" {
+  vpc_id = aws_vpc.vpc_ecs.id
+
+  tags = merge(local.common_tags, {
+    Name = "${var.app_name}-egress-only-igw"
+  })
 }
 
-
-resource "aws_nat_gateway" "natgateway" {
-  count         = 2
-  allocation_id = aws_eip.eip_natgw[count.index].id
-  subnet_id     = aws_subnet.public_subnets[count.index].id
-}
-
-resource "aws_route_table_association" "private_rt_asso" {
-  count          = 2
-  subnet_id      = element(aws_subnet.private_subnets[*].id, count.index)
-  route_table_id = aws_route_table.private_route_table[count.index].id
-}
-
+// Create Private Route Table
 resource "aws_route_table" "private_route_table" {
   vpc_id = aws_vpc.vpc_ecs.id
 
-  count = 2
   route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.natgateway[count.index].id
+    ipv6_cidr_block = "::/0"
+    egress_only_gateway_id = aws_egress_only_internet_gateway.egress_only_igw.id
   }
 
   tags = merge(local.common_tags, {
-    Name = "${var.app_name}-private-rtable"
+    Name = "${var.app_name}-private-route-table"
   })
+}
+
+// Associate Private Subnets with Private Route Table
+resource "aws_route_table_association" "private_rt_asso" {
+  count          = 2
+  subnet_id      = element(aws_subnet.private_subnets[*].id, count.index)
+  route_table_id = aws_route_table.private_route_table.id
 }
 

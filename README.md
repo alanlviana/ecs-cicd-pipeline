@@ -1,5 +1,7 @@
 ## ECS CI/CD Pipeline Example
 
+![Pipeline GitFlow](docs/pipeline.drawio.png)
+
 This repository provides an automated way to deploy a docker application running as an ECS Service using Github actions and terraform.
 
 # Features
