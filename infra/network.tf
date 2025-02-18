@@ -8,6 +8,7 @@ data "aws_availability_zones" "available_zones" {
 resource "aws_vpc" "vpc_ecs" {
   cidr_block = var.vpc_cidr
   assign_generated_ipv6_cidr_block = true
+  enable_dns_hostnames = true
   
   tags = merge(local.common_tags, {
     Name = "${var.app_name}-vpc"
@@ -78,22 +79,9 @@ resource "aws_subnet" "private_subnets" {
   })
 }
 
-resource "aws_egress_only_internet_gateway" "egress_only_igw" {
-  vpc_id = aws_vpc.vpc_ecs.id
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-egress-only-igw"
-  })
-}
-
 // Create Private Route Table
 resource "aws_route_table" "private_route_table" {
   vpc_id = aws_vpc.vpc_ecs.id
-
-  route {
-    ipv6_cidr_block = "::/0"
-    egress_only_gateway_id = aws_egress_only_internet_gateway.egress_only_igw.id
-  }
 
   tags = merge(local.common_tags, {
     Name = "${var.app_name}-private-route-table"
