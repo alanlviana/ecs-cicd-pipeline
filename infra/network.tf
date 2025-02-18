@@ -69,6 +69,7 @@ resource "aws_subnet" "private_subnets" {
   cidr_block        = cidrsubnet(var.vpc_cidr, 8, 2 + count.index)
   ipv6_cidr_block   = cidrsubnet(aws_vpc.vpc_ecs.ipv6_cidr_block, 8, 2 + count.index)
   availability_zone = data.aws_availability_zones.available_zones.names[count.index]
+  assign_ipv6_address_on_creation = true
 
   map_public_ip_on_launch = false
 
