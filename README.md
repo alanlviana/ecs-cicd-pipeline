@@ -10,5 +10,6 @@ This repository provides an automated way to deploy a docker application running
 - **Automated cleanup**: Supports automatic resource destruction via a configuration file.
 - **Multi-Environment Deployment**: Uses git branches to manage different environments.
 
+
 ## Prerequisites
 - AWS Account with IAM permissions for OICD Authentication.
