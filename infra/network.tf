@@ -59,39 +59,3 @@ resource "aws_route_table_association" "public_rt_asso" {
   subnet_id      = element(aws_subnet.public_subnets[*].id, count.index)
   route_table_id = aws_route_table.public_route_table.id
 }
-
-
-
-// Create Private Subnets and Route table
-resource "aws_subnet" "private_subnets" {
-  vpc_id = aws_vpc.vpc_ecs.id
-
-  count             = 2
-  cidr_block        = cidrsubnet(var.vpc_cidr, 8, 2 + count.index)
-  ipv6_cidr_block   = cidrsubnet(aws_vpc.vpc_ecs.ipv6_cidr_block, 8, 2 + count.index)
-  availability_zone = data.aws_availability_zones.available_zones.names[count.index]
-  assign_ipv6_address_on_creation = true
-
-  map_public_ip_on_launch = false
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-private-subnet-${count.index + 1}"
-  })
-}
-
-// Create Private Route Table
-resource "aws_route_table" "private_route_table" {
-  vpc_id = aws_vpc.vpc_ecs.id
-
-  tags = merge(local.common_tags, {
-    Name = "${var.app_name}-private-route-table"
-  })
-}
-
-// Associate Private Subnets with Private Route Table
-resource "aws_route_table_association" "private_rt_asso" {
-  count          = 2
-  subnet_id      = element(aws_subnet.private_subnets[*].id, count.index)
-  route_table_id = aws_route_table.private_route_table.id
-}
-
