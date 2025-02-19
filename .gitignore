@@ -1,1 +1,4 @@
 .terraform*
+__pycache__/
+.coverage
+coverage.xml

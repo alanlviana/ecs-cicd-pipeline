@@ -15,6 +15,10 @@ environments:
     aws-statefile-s3-bucket: 'alanlviana-statefile-s3'
     aws-statefile-dynamodb-table: 'alanlviana-statefile-dynamodb'
 
+unit-tests:
+  directory: 'tests'
+  fail-under: 80
+
 terraform:
   version: 1.9.8
   destroy: true

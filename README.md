@@ -9,7 +9,10 @@ This repository provides an automated way to deploy a docker application running
 - **Infraestructure as code**: Deploy AWS resources using Terraform.
 - **Automated cleanup**: Supports automatic resource destruction via a configuration file.
 - **Multi-Environment Deployment**: Uses git branches to manage different environments.
+- **Branch-based releases**: Each release is created from a specific branch, allowing for organized and controlled deployment.
 
+# Architecture
+![Pipeline GitFlow](docs/infrastructure.drawio.png)
 
 ## Prerequisites
 - AWS Account with IAM permissions for OICD Authentication.

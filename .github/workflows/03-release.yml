@@ -35,6 +35,7 @@ jobs:
         id: config
         with:
           file-path: 'config-pipeline.yml'
+          
       - name: Get latest version
         id: get_version
         run: |
