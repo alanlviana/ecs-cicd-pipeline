@@ -15,6 +15,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - uses: actions-tools/yaml-outputs@v2
+        id: config
+        with:
+          file-path: 'config-pipeline.yml'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+        python-version: '3.13' 
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ${{ step.config.outputs.unit-tests__directory }}/requirements.txt
+
+      - name: Run tests and collect coverage
+        run: |
+          coverage run -m pytest --source app
+          coverage report --fail-under=${{ step.config.outputs.unit-tests__fail-under }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
