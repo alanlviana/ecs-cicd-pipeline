@@ -8,8 +8,8 @@ permissions:
   pull-requests: write
 
 jobs:
-  build:
-    name: Build Docker Image
+  unit-test:
+    name: Unit Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -33,7 +33,18 @@ jobs:
       - name: Run tests and collect coverage
         run: |
           coverage run --source app -m unittest 
-          coverage report --fail-under=${{ steps.config.outputs.unit-tests__fail-under }}
+          coverage report --fail-under=${{ steps.config.outputs.unit-tests__fail-under }}          
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: actions-tools/yaml-outputs@v2
+        id: config
+        with:
+          file-path: 'config-pipeline.yml'
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
