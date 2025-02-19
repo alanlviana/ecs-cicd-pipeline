@@ -32,7 +32,7 @@ jobs:
 
       - name: Run tests and collect coverage
         run: |
-          coverage run -m unittest --source app
+          coverage run --source app -m unittest 
           coverage report --fail-under=${{ steps.config.outputs.unit-tests__fail-under }}
 
       - name: Set up Docker Buildx
